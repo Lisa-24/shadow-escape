@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jumping Ball - One Button Game</title>
+  <style>
+    /* General Styles */
+    body {
+      margin: 0;
+      font-family: 'Poppins', sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      background: #f0f4f8;
+    }
+
+    /* Screens */
+    .screen { display: none; flex-direction: column; align-items: center; }
+    .screen.active { display: flex; }
+
+    /* Card Style */
+    .card {
+      background: #ffffff;
+      border-radius: 20px;
+      box-shadow: 0 6px 12px rgba(0,0,0,0.1);
+      padding: 20px;
+      text-align: center;
+      max-width: 350px;
+    }
+
+    /* Buttons */
+    button {
+      margin: 10px;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 12px;
+      background: #81c784;
+      color: #fff;
+      font-size: 16px;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    button:hover { background: #66bb6a; }
+
+    /* Modal */
+    .modal {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.4);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .hidden { display: none; }
+
+    /* Game Board */
+    #game-board {
+      position: relative;
+      width: 600px;
+      height: 200px;
+      background: #d0e6ff;
+      margin: 20px 0;
+      border-radius: 15px;
+      overflow: hidden;
+    }
+
+    /* Ball */
+    #ball {
+      position: absolute;
+      bottom: 0;
+      left: 50px;
+      width: 40px;
+      height: 40px;
+      background: #ffb74d;
+      border-radius: 50%;
+      transition: bottom 0.2s;
+    }
+
+    /* Obstacles */
+    .obstacle {
+      position: absolute;
+      bottom: 0;
+      width: 40px;
+      height: 40px;
+      background: #ef5350;
+    }
+
+    /* Level Indicator */
+    #level-indicator { font-weight: bold; color: #333; }
+  </style>
+</head>
+<body>
+
+  <!-- Start Screen -->
+  <div id="start-screen" class="screen active">
+    <div class="card">
+      <h1>Jumping Ball</h1>
+      <button id="how-btn">How to Play?</button>
+      <button id="play-btn">Play</button>
+    </div>
+
+    <!-- How to Play Modal -->
+    <div id="how-card" class="modal hidden">
+      <div class="card">
+        <h2>How to Play</h2>
+        <p>Press the "Jump" button or spacebar to jump over obstacles. Avoid hitting obstacles to reach the end of the level. There are 5 levels of increasing difficulty.</p>
+        <button id="close-how">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Game Screen -->
+  <div id="game-screen" class="screen hidden">
+    <h2 id="level-indicator">Level 1</h2>
+    <div id="game-board">
+      <div id="ball"></div>
+    </div>
+    <button id="jump-btn">Jump</button>
+  </div>
+
+  <!-- Popup -->
+  <div id="popup" class="modal hidden">
+    <div class="card">
+      <h2 id="popup-text"></h2>
+      <button id="restart-btn">Restart</button>
+    </div>
+  </div>
+
+  <script>
+    // ---------------- Elements ----------------
+    const startScreen = document.getElementById("start-screen");
+    const gameScreen = document.getElementById("game-screen");
+    const playBtn = document.getElementById("play-btn");
+    const howBtn = document.getElementById("how-btn");
+    const howCard = document.getElementById("how-card");
+    const closeHow = document.getElementById("close-how");
+    const jumpBtn = document.getElementById("jump-btn");
+    const popup = document.getElementById("popup");
+    const popupText = document.getElementById("popup-text");
+    const restartBtn = document.getElementById("restart-btn");
+    const levelIndicator = document.getElementById("level-indicator");
+    const gameBoard = document.getElementById("game-board");
+    const ball = document.getElementById("ball");
+
+    // ---------------- Game Variables ----------------
+    let currentLevel = 1;
+    const maxLevel = 5;
+    let obstacles = [];
+    let ballPosition = { x: 50, bottom: 0 };
+    let ballJumping = false;
+    let gameInterval;
+    let obstacleSpeed = 4;
+
+    // ---------------- Event Listeners ----------------
+    howBtn.addEventListener("click", () => howCard.classList.remove("hidden"));
+    closeHow.addEventListener("click", () => howCard.classList.add("hidden"));
+
+    playBtn.addEventListener("click", () => {
+        startScreen.classList.add("hidden");
+        gameScreen.classList.remove("hidden");
+        startGame();
+    });
+
+    jumpBtn.addEventListener("click", jump);
+    document.addEventListener("keydown", e => { if(e.code === "Space") jump(); });
+
+    restartBtn.addEventListener("click", () => {
+        popup.classList.add("hidden");
+        currentLevel = 1;
+        startGame();
+    });
+
+    // ---------------- Functions ----------------
+    function startGame() {
+        levelIndicator.innerText = "Level " + currentLevel;
+        ball.style.bottom = "0px";
+        ballPosition.bottom = 0;
+        ballPosition.x = 50;
+        clearInterval(gameInterval);
+        createObstacles();
+        gameInterval = setInterval(moveObstacles, 20);
+    }
+
+    function createObstacles() {
+        gameBoard.querySelectorAll(".obstacle").forEach(o => o.remove());
+        obstacles = [];
+        const numObstacles = 3 + currentLevel; 
+        for(let i=0; i<numObstacles; i++){
+            const obs = document.createElement("div");
+            obs.classList.add("obstacle");
+            obs.style.left = 400 + i*200 + Math.random()*200 + "px";
+            gameBoard.appendChild(obs);
+            obstacles.push(obs);
+        }
+    }
+
+    function moveObstacles() {
+        obstacles.forEach(obs => {
+            let left = parseInt(obs.style.left);
+            left -= obstacleSpeed;
+            obs.style.left = left + "px";
+
+            // Collision
+            if(left < ballPosition.x + 40 && left + 40 > ballPosition.x && ballPosition.bottom < 40){
+                gameOver("You Lost!");
+            }
+
+            // Passed obstacle, move it further
+            if(left < -50) {
+                obs.style.left = 600 + Math.random()*300 + "px";
+            }
+        });
+
+        // Check level completion
+        const lastObs = obstacles[obstacles.length-1];
+        if(parseInt(lastObs.style.left) + 40 < ballPosition.x){
+            nextLevel();
+        }
+    }
+
+    function jump() {
+        if(ballJumping) return;
+        ballJumping = true;
+        let up = 0;
+        const jumpHeight = 100;
+        const upInterval = setInterval(()=>{
+            up += 10;
+            ballPosition.bottom = up;
+            ball.style.bottom = up + "px";
+            if(up >= jumpHeight){
+                clearInterval(upInterval);
+                const downInterval = setInterval(()=>{
+                    up -= 10;
+                    ballPosition.bottom = up;
+                    ball.style.bottom = up + "px";
+                    if(up <= 0){
+                        clearInterval(downInterval);
+                        ballJumping = false;
+                        ballPosition.bottom = 0;
+                    }
+                },20);
+            }
+        },20);
+    }
+
+    function gameOver(text) {
+        clearInterval(gameInterval);
+        popupText.innerText = text;
+        popup.classList.remove("hidden");
+    }
+
+    function nextLevel() {
+        clearInterval(gameInterval);
+        if(currentLevel >= maxLevel){
+            popupText.innerText = "You Won!";
+            popup.classList.remove("hidden");
+            currentLevel = 1;
+        } else {
+            currentLevel++;
+            startGame();
+        }
+    }
+  </script>
+</body>
+</html>
